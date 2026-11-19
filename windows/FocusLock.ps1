@@ -180,10 +180,24 @@ function Start-UI {
         [IO.File]::WriteAllText($tmp, $text)
         Move-Item $tmp $ReqPath -Force
     }
+    $addLabel = New-Object Windows.Forms.Label
+    $addLabel.SetBounds(34, 300, 80, 40); $addLabel.TextAlign = 'MiddleLeft'; $addLabel.Text = 'Add time'
+    $addLabel.Font = New-Object Drawing.Font('Segoe UI', 9.5); $addLabel.ForeColor = $muted
+    $form.Controls.Add($addLabel)
+    $addButtons = @()
+    $x = 116
+    foreach ($d in @(@(15, '+15m'), @(30, '+30m'), @(60, '+1h'), @(120, '+2h'))) {
+        $b = New-Object Windows.Forms.Button
+        $b.SetBounds($x, 302, 62, 36); $x += 69
+        $b.Text = $d[1]; $b.Tag = $d[0]; $b.FlatStyle = 'Flat'; $b.FlatAppearance.BorderSize = 0
+        $b.BackColor = $white; $b.ForeColor = $ink
+        $b.Font = New-Object Drawing.Font('Segoe UI', 9.5, [Drawing.FontStyle]::Bold)
+        $b.Add_Click({ Send-Request "on $([int]$script:remaining + [int]$this.Tag * 60)" })
+        $form.Controls.Add($b); $addButtons += $b
+    }
     $main.Add_Click({
         switch ($script:action) {
             'lock' { Send-Request "on $($script:minutes * 60)" }
-            'extend' { Send-Request "on $([int]$script:remaining + 1800)" }
             'off' { Send-Request 'off' }
         }
     })
@@ -212,7 +226,10 @@ function Start-UI {
             if ([int]$b.Tag -eq $script:minutes) { $b.BackColor = $moss; $b.ForeColor = $white } else { $b.BackColor = $white; $b.ForeColor = $ink }
         }
         $clock.Visible = $on -and $script:remaining -gt 0
-        $main.Visible = $installed
+        $adding = $on -and $script:remaining -gt 0
+        $main.Visible = $installed -and -not $adding
+        $addLabel.Visible = $adding
+        foreach ($b in $addButtons) { $b.Visible = $adding }
         if (-not $installed) {
             $title.Text = 'Not installed'; $sub.Text = 'Run the Focus Lock installer first.'; $script:action = ''
         } elseif (-not $on) {
@@ -224,7 +241,7 @@ function Start-UI {
             $s = [int][Math]::Ceiling($script:remaining)
             $clock.Text = '{0}:{1:00}:{2:00}' -f [Math]::Floor($s / 3600), ([Math]::Floor($s / 60) % 60), ($s % 60)
             $sub.Text = "Ends at $(Get-EndText ([double]$st.lockedUntil)). No turning it off until then."
-            $main.Text = 'Add 30 minutes'; $main.BackColor = $white; $main.ForeColor = $ink; $script:action = 'extend'
+            $script:action = ''
         } else {
             $title.Text = 'Locked in'; $sub.Text = 'Timer done. Blocking stays on until you turn it off.'
             $main.Text = 'Turn off'; $main.BackColor = $ink; $main.ForeColor = $white; $script:action = 'off'

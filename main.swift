@@ -288,7 +288,15 @@ struct ContentView: View {
                 if m.remaining > 0 {
                     Text(clock(m.remaining)).font(.system(size: 30, weight: .medium, design: .rounded)).monospacedDigit().foregroundColor(clay)
                     Text("Ends at \(endText(m.state?.lockedUntil ?? 0)). No turning it off until then.").font(.system(size: 13)).foregroundColor(muted)
-                    Button("Add 30 minutes") { m.extend(30) }.buttonStyle(Pill(fill: .white, fg: ink))
+                    HStack(spacing: 8) {
+                        Text("Add time").font(.system(size: 13)).foregroundColor(muted)
+                        ForEach([(15, "+15m"), (30, "+30m"), (60, "+1h"), (120, "+2h")], id: \.0) { v, label in
+                            Button(label) { m.extend(v) }.buttonStyle(.plain)
+                                .font(.system(size: 13, weight: .semibold)).foregroundColor(ink)
+                                .padding(.horizontal, 13).padding(.vertical, 9)
+                                .background(Capsule().fill(Color.white))
+                        }
+                    }
                 } else {
                     Text("Timer done. Blocking stays on until you turn it off.")
                         .font(.system(size: 13)).foregroundColor(muted).multilineTextAlignment(.center)
