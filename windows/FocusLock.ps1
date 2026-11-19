@@ -192,6 +192,14 @@ function Start-UI {
     if ($d.Count -gt 5) { $foot.Text = 'Blocks ' + (($d | Select-Object -First 5) -join ', ') + " and $($d.Count - 5) more" }
     else { $foot.Text = 'Blocks ' + ($d -join ', ') }
 
+    function Get-EndText($unix) {
+        # local time zone and the user's own 12/24-hour setting
+        $d = [DateTimeOffset]::FromUnixTimeSeconds([long]$unix).LocalDateTime
+        $time = $d.ToString('t')
+        if ($d.Date -eq (Get-Date).Date) { return $time }
+        if ($d.Date -eq (Get-Date).Date.AddDays(1)) { return "$time tomorrow" }
+        return $d.ToString('g')
+    }
     function Update-View {
         $st = Read-State
         $t = Now
@@ -209,13 +217,13 @@ function Start-UI {
             $title.Text = 'Not installed'; $sub.Text = 'Run the Focus Lock installer first.'; $script:action = ''
         } elseif (-not $on) {
             $title.Text = 'Ready to lock in?'
-            if ($script:minutes -eq 0) { $sub.Text = 'You can turn it off any time.' } else { $sub.Text = 'Once on, it cannot be turned off until the timer ends.' }
+            if ($script:minutes -eq 0) { $sub.Text = 'You can turn it off any time.' } else { $sub.Text = "Ends at $(Get-EndText ($t + $script:minutes * 60)). Once on, it cannot be turned off until then." }
             $main.Text = 'Lock in'; $main.BackColor = $clay; $main.ForeColor = $white; $script:action = 'lock'
         } elseif ($script:remaining -gt 0) {
             $title.Text = 'Locked in'
             $s = [int][Math]::Ceiling($script:remaining)
             $clock.Text = '{0}:{1:00}:{2:00}' -f [Math]::Floor($s / 3600), ([Math]::Floor($s / 60) % 60), ($s % 60)
-            $sub.Text = 'No turning it off until the timer ends.'
+            $sub.Text = "Ends at $(Get-EndText ([double]$st.lockedUntil)). No turning it off until then."
             $main.Text = 'Add 30 minutes'; $main.BackColor = $white; $main.ForeColor = $ink; $script:action = 'extend'
         } else {
             $title.Text = 'Locked in'; $sub.Text = 'Timer done. Blocking stays on until you turn it off.'

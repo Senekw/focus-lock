@@ -36,7 +36,7 @@ Done. Focus Lock opens, and there is a **Focus Lock** shortcut on your desktop a
 2. Pick a time: 30m, 1h, 2h or 3h. (Pick **No timer** if you want to be able to switch it off whenever.)
 3. Click **Lock in**.
 
-Until the timer ends there is no off button. When it ends, blocking stays on until you click **Turn off**.
+Focus Lock shows the exact time the lock ends (for example "Ends at 6:45 PM"), in your own time zone and clock format. Until then there is no off button. When it ends, blocking stays on until you click **Turn off**.
 
 The first time you lock in on a Mac, it asks if Focus Lock can control your browser. Click **Allow** so it can close blocked tabs you already have open.
 

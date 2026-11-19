@@ -257,6 +257,14 @@ struct ContentView: View {
         let head = d.prefix(5).joined(separator: " · ")
         return d.count > 5 ? head + " and \(d.count - 5) more" : head
     }()
+    func endText(_ t: Double) -> String {
+        // local time zone and the user's own 12/24-hour setting
+        let d = Date(timeIntervalSince1970: t)
+        let time = d.formatted(date: .omitted, time: .shortened)
+        if Calendar.current.isDateInToday(d) { return time }
+        if Calendar.current.isDateInTomorrow(d) { return time + " tomorrow" }
+        return d.formatted(date: .abbreviated, time: .shortened)
+    }
     func clock(_ s: Double) -> String {
         let i = Int(s.rounded(.up)); return String(format: "%d:%02d:%02d", i / 3600, (i / 60) % 60, i % 60)
     }
@@ -279,7 +287,7 @@ struct ContentView: View {
                 Text("Locked in").font(.custom("Georgia", size: 34)).foregroundColor(ink)
                 if m.remaining > 0 {
                     Text(clock(m.remaining)).font(.system(size: 30, weight: .medium, design: .rounded)).monospacedDigit().foregroundColor(clay)
-                    Text("No turning it off until the timer ends.").font(.system(size: 13)).foregroundColor(muted)
+                    Text("Ends at \(endText(m.state?.lockedUntil ?? 0)). No turning it off until then.").font(.system(size: 13)).foregroundColor(muted)
                     Button("Add 30 minutes") { m.extend(30) }.buttonStyle(Pill(fill: .white, fg: ink))
                 } else {
                     Text("Timer done. Blocking stays on until you turn it off.")
@@ -297,7 +305,7 @@ struct ContentView: View {
                             .background(Capsule().fill(m.minutes == v ? moss : Color.white))
                     }
                 }
-                Text(m.minutes == 0 ? "You can turn it off any time." : "Once on, it cannot be turned off until the timer ends.")
+                Text(m.minutes == 0 ? "You can turn it off any time." : "Ends at \(endText(m.t + Double(m.minutes) * 60)). Once on, it cannot be turned off until then.")
                     .font(.system(size: 13)).foregroundColor(muted)
                 Button(m.pending ? "Locking…" : "Lock in") { m.lock() }.buttonStyle(Pill(fill: clay))
             }
