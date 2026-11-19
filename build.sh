@@ -27,5 +27,9 @@ cat > "$A/Contents/Info.plist" <<P
 </dict></plist>
 P
 codesign --force -s - "$A"
-if [ -n "$RELEASE" ]; then (cd build && ditto -c -k --keepParent "Focus Lock.app" FocusLock.zip); fi
+if [ -n "$RELEASE" ]; then
+  (cd build && ditto -c -k --keepParent "Focus Lock.app" FocusLock-Mac.zip)
+  mkdir -p build/FocusLock-Windows && cp windows/*.ps1 windows/*.cmd blocklist.txt build/FocusLock-Windows/ && rm -f build/FocusLock-Windows/get.ps1
+  (cd build && zip -qr FocusLock-Windows.zip FocusLock-Windows)
+fi
 echo "built: $A (blocklist: $LIST)"

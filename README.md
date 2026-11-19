@@ -1,81 +1,125 @@
 # Focus Lock
 
-A small Mac app that blocks distracting sites and apps while you study. Pick a timer, hit **Lock in**, and it cannot be turned off until the timer ends.
+Blocks YouTube, Instagram, TikTok and other distractions on your computer while you study. Pick a timer, hit **Lock in**, and you cannot turn it off until the timer ends.
 
-- Blocks sites in every browser (Chrome, Safari, Opera, Brave, Edge, Arc) through `/etc/hosts`
-- Replaces already-open tabs of blocked sites with a "Locked in" page
-- Quits blocked apps (for example the Instagram desktop app) while locked
-- Signs you out of blocked sites by clearing their cookies whenever the browser is closed during a lock
-- Timer choices: 30m, 1h, 2h, 3h, or no timer (free toggle)
+Free. Works on **Mac** and **Windows**.
 
-Requires macOS 13 or later. Works on Apple Silicon and Intel.
+## Install on Mac
 
-## Install
+1. Open **Terminal** (press Cmd + Space, type `Terminal`, press Enter).
+2. Paste this line and press Enter:
 
-### Option 1: build it yourself (recommended)
+   ```sh
+   curl -fsSL https://raw.githubusercontent.com/Senekw/focus-lock/main/get.sh | bash
+   ```
 
-Needs Xcode command line tools (`xcode-select --install`).
+3. Focus Lock opens. Click **Finish setup** and type your Mac password.
 
-```sh
-git clone https://github.com/Senekw/focus-lock.git
-cd focus-lock
-# edit blocklist.txt now: the list is fixed once installed
-bash build.sh
-cp -R "build/Focus Lock.app" /Applications/
-open "/Applications/Focus Lock.app"
-```
+Done. Focus Lock is in your Applications folder. Drag it to your Dock to keep it handy.
 
-Click **Finish setup** and enter your Mac password once. A locally built app opens without any Gatekeeper warning.
+## Install on Windows
 
-### Option 2: download
+1. Click the Start button, type `PowerShell`, press Enter.
+2. Paste this line and press Enter:
 
-Grab `FocusLock.zip` from [Releases](https://github.com/Senekw/focus-lock/releases), unzip, and move the app to Applications. The app is not notarized, so the first launch is refused: go to System Settings > Privacy & Security and click **Open Anyway**. The download ships with the default blocklist.
+   ```powershell
+   irm https://raw.githubusercontent.com/Senekw/focus-lock/main/windows/get.ps1 | iex
+   ```
 
-### First lock
+3. Click **Yes** when Windows asks for permission.
 
-The first time you lock in, macOS asks whether Focus Lock may control your browser. Click **Allow** so it can replace open tabs of blocked sites.
+Done. Focus Lock opens, and there is a **Focus Lock** shortcut on your desktop and in the Start menu.
 
-## Blocklist
+## How to use it
 
-Edit `blocklist.txt` before building:
+1. Open Focus Lock.
+2. Pick a time: 30m, 1h, 2h or 3h. (Pick **No timer** if you want to be able to switch it off whenever.)
+3. Click **Lock in**.
 
-```
-domain youtube.com        # blocks the site and all its subdomains
-host m.youtube.com        # extra exact hostname for /etc/hosts
-app Instagram             # app name or bundle id to quit while locked
-```
+Until the timer ends there is no off button. When it ends, blocking stays on until you click **Turn off**.
 
-To change the list later, edit the file, rebuild, copy the app to Applications again, and rerun the installer:
+The first time you lock in on a Mac, it asks if Focus Lock can control your browser. Click **Allow** so it can close blocked tabs you already have open.
 
-```sh
-sudo bash "/Applications/Focus Lock.app/Contents/Resources/install.sh"
-```
+## What gets blocked
 
-## How it works
+YouTube, Instagram, Threads, TikTok, LinkedIn, Facebook, X (Twitter), Reddit, Twitch and Netflix, in every browser. The Instagram, YouTube, TikTok and Netflix apps are closed while you are locked in.
 
-One binary runs in three modes:
+Want a different list? See "Change the blocklist" below.
 
-| Mode | Runs as | Job |
-| --- | --- | --- |
-| App | you | The window with the toggle. It only writes a request file. |
-| `--daemon` | root (LaunchDaemon) | Owns the lock state and timer, writes the block section of `/etc/hosts`, restarts the agent if it is stopped. |
-| `--agent` | you (LaunchAgent) | Redirects blocked tabs, quits blocked apps, clears cookies. |
+## Questions
 
-The daemon ignores "off" requests until the timer ends, and everything it uses lives in root-owned folders, so getting around the lock takes an admin password and real effort. It is friction, not a security boundary: anyone with admin rights can remove it.
+**Why does it need my password (Mac) or admin permission (Windows)?**
+Blocking websites for the whole computer needs it, and it is also what stops you from just switching the blocker off.
 
-## Limits
+**I really need to get out of a lock early.**
+Uninstall it (below). That takes your password on purpose.
 
-- Blocking YouTube also blocks YouTube videos embedded in other sites.
-- A YouTube sign-out does not stick if you are signed into Google in the same browser.
-- Safari cookies are not cleared (macOS protects them).
-- Sites reached through a VPN browser extension or a proxy may slip past the hosts block; the tab redirect still catches them in supported browsers.
+**Chrome or Edge says "Managed by your organization" (Windows).**
+That is Focus Lock's block rule. It goes away when the lock is off.
+
+**A class video won't play.**
+Blocking YouTube also blocks YouTube videos embedded in other sites, like Canvas. Use **No timer** for those sessions, or turn the lock off first.
 
 ## Uninstall
 
+Mac, in Terminal:
+
 ```sh
-sudo bash uninstall.sh
-rm -rf "/Applications/Focus Lock.app"
+curl -fsSL https://raw.githubusercontent.com/Senekw/focus-lock/main/uninstall.sh | sudo bash
 ```
+
+Then delete Focus Lock from Applications.
+
+Windows, in PowerShell:
+
+```powershell
+Start-Process powershell -Verb RunAs -ArgumentList '-ExecutionPolicy Bypass -File "C:\Program Files\FocusLock\uninstall.ps1"'
+```
+
+---
+
+## For the curious
+
+### Other ways to install
+
+- **Download instead of pasting a command:** get `FocusLock-Mac.zip` or `FocusLock-Windows.zip` from [Releases](https://github.com/Senekw/focus-lock/releases/latest).
+  - Mac: unzip and move the app to Applications. The first launch is refused because the app is not notarized: go to System Settings > Privacy & Security and click **Open Anyway**.
+  - Windows: unzip, then double-click **Install Focus Lock**. If Windows shows "Windows protected your PC", click **More info**, then **Run anyway**.
+- **Build the Mac app yourself:** needs Xcode command line tools (`xcode-select --install`), then `bash build.sh` and copy `build/Focus Lock.app` to Applications.
+
+### Change the blocklist
+
+The list is fixed at install time, so edit it first. Clone this repo and edit `blocklist.txt`:
+
+```
+domain youtube.com
+host m.youtube.com
+app Instagram
+```
+
+- `domain` blocks a site and its subdomains
+- `host` adds one extra exact hostname (hosts files have no wildcards)
+- `app` is an app to close while locked (Mac: app name or bundle id. Windows: process name)
+
+Then install from your copy: on Mac run `bash build.sh`, copy the app to Applications and click **Finish setup** (or rerun `sudo bash "/Applications/Focus Lock.app/Contents/Resources/install.sh"`). On Windows double-click `windows/Install Focus Lock.cmd`.
+
+### How it works
+
+| Part | Runs as | Job |
+| --- | --- | --- |
+| The window | you | Shows the toggle. It only writes a request file. |
+| Background service | root (Mac LaunchDaemon) or SYSTEM (Windows scheduled task) | Owns the lock state and timer, writes the block section of the hosts file, ignores "off" until the timer ends. |
+| Mac helper | you (LaunchAgent) | Replaces open tabs of blocked sites, closes blocked apps, clears their login cookies when the browser is closed. |
+
+On Windows the service also sets the `URLBlocklist` policy for Chrome, Edge and Brave, and closes blocked apps itself.
+
+The lock is friction, not a security boundary. Anyone with admin rights on the computer can remove it.
+
+### Limits
+
+- Mac: a YouTube sign-out does not stick if you are signed into Google in the same browser. Safari cookies are not cleared.
+- Windows: you are not signed out of sites, and a video already playing in an open tab can keep going until the page reloads.
+- Sites reached through a VPN extension or proxy can slip past the hosts block.
 
 ## License
 
