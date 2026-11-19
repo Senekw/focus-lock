@@ -1,0 +1,41 @@
+# Focus Lock blocklist. Edit this BEFORE you build and install.
+# (To keep a private list out of git, save it as blocklist.local.txt instead;
+#  build.sh uses that file when it exists.)
+#
+# domain = blocked with all subdomains (open tabs) and added to /etc/hosts with www.
+# host   = extra exact hostname for /etc/hosts (hosts files have no wildcards)
+# app    = app name or bundle id that gets quit while locked
+domain youtube.com
+host m.youtube.com
+host music.youtube.com
+host studio.youtube.com
+host tv.youtube.com
+host youtubei.googleapis.com
+host youtube.googleapis.com
+domain youtu.be
+domain youtube-nocookie.com
+domain instagram.com
+host i.instagram.com
+host l.instagram.com
+host graph.instagram.com
+domain cdninstagram.com
+domain threads.net
+domain threads.com
+domain tiktok.com
+host m.tiktok.com
+host vm.tiktok.com
+domain linkedin.com
+domain facebook.com
+host m.facebook.com
+domain x.com
+domain twitter.com
+host mobile.twitter.com
+domain reddit.com
+host old.reddit.com
+domain twitch.tv
+host m.twitch.tv
+domain netflix.com
+app Instagram
+app YouTube
+app TikTok
+app Netflix
