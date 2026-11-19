@@ -206,7 +206,7 @@ function Start-UI {
         $clock.Visible = $on -and $script:remaining -gt 0
         $main.Visible = $installed
         if (-not $installed) {
-            $title.Text = 'Not installed'; $sub.Text = 'Run 'Install Focus Lock' first.'; $script:action = ''
+            $title.Text = 'Not installed'; $sub.Text = 'Run the Focus Lock installer first.'; $script:action = ''
         } elseif (-not $on) {
             $title.Text = 'Ready to lock in?'
             if ($script:minutes -eq 0) { $sub.Text = 'You can turn it off any time.' } else { $sub.Text = 'Once on, it cannot be turned off until the timer ends.' }
