@@ -40,6 +40,12 @@ Focus Lock shows the exact time the lock ends (for example "Ends at 6:45 PM"), i
 
 The first time you lock in on a Mac, it asks if Focus Lock can control your browser. Click **Allow** so it can close blocked tabs you already have open.
 
+## Updates
+
+Focus Lock updates itself. About every 6 hours it checks this page for a new release and installs it in the background, keeping your lock and your blocklist. (Versions before 1.4 cannot do this: run the install line once more to get on the self-updating version.)
+
+On Mac, after an update macOS may ask again whether Focus Lock can control your browser. Click **Allow**.
+
 ## What gets blocked
 
 YouTube, Instagram, Threads, TikTok, LinkedIn, Facebook, X (Twitter), Reddit, Twitch and Netflix, in every browser. The Instagram, YouTube, TikTok and Netflix apps are closed while you are locked in.
@@ -112,6 +118,8 @@ Then install from your copy: on Mac run `bash build.sh`, copy the app to Applica
 | Mac helper | you (LaunchAgent) | Replaces open tabs of blocked sites, closes blocked apps, clears their login cookies when the browser is closed. |
 
 On Windows the service also sets the `URLBlocklist` policy for Chrome, Edge and Brave, and closes blocked apps itself.
+
+Self-update: the background service downloads the newest release zip from this repo over HTTPS, checks it (code signature and version on Mac, script syntax and version on Windows), swaps it in and restarts itself. That means whoever controls this repo controls what runs. Fork it and change the URL in the source if you want to control that yourself.
 
 The lock is friction, not a security boundary. Anyone with admin rights on the computer can remove it.
 

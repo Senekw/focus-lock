@@ -50,6 +50,51 @@ func readList() -> BlockList {
     p.waitUntilExit(); return p.terminationStatus
 }
 
+func shOut(_ path: String, _ args: [String]) -> String {
+    let p = Process(); p.executableURL = URL(fileURLWithPath: path); p.arguments = args
+    let pipe = Pipe(); p.standardOutput = pipe; p.standardError = FileHandle.nullDevice
+    do { try p.run() } catch { return "" }
+    let d = pipe.fileHandleForReading.readDataToEndOfFile(); p.waitUntilExit()
+    return String(data: d, encoding: .utf8) ?? ""
+}
+func isNewer(_ a: String, than b: String) -> Bool {
+    let x = a.split(separator: ".").map { Int($0) ?? 0 }, y = b.split(separator: ".").map { Int($0) ?? 0 }
+    for i in 0..<max(x.count, y.count) {
+        let l = i < x.count ? x[i] : 0, r = i < y.count ? y[i] : 0
+        if l != r { return l > r }
+    }
+    return false
+}
+// Installs the newest GitHub release over this copy. Lock state and blocklist are kept.
+func selfUpdate() {
+    let repo = "https://github.com/Senekw/focus-lock/releases"
+    let cur = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0"
+    let latest = shOut("/usr/bin/curl", ["-fsSL", "-m", "20", "-o", "/dev/null", "-w", "%{url_effective}", repo + "/latest"])
+    guard let r = latest.range(of: "/tag/v") else { return }
+    let tag = String(latest[r.upperBound...]).trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !tag.isEmpty, tag.allSatisfy({ $0.isNumber || $0 == "." }), isNewer(tag, than: cur) else { return }
+    let tmp = root + "/update", app = tmp + "/Focus Lock.app"
+    sh("/bin/rm", ["-rf", tmp]); sh("/bin/mkdir", ["-p", tmp])
+    defer { sh("/bin/rm", ["-rf", tmp]) }
+    guard sh("/usr/bin/curl", ["-fsSL", "-m", "180", "-o", tmp + "/f.zip", "\(repo)/download/v\(tag)/FocusLock-Mac.zip"]) == 0,
+          sh("/usr/bin/ditto", ["-x", "-k", tmp + "/f.zip", tmp]) == 0,
+          sh("/usr/bin/codesign", ["-v", app]) == 0,
+          let info = NSDictionary(contentsOfFile: app + "/Contents/Info.plist"),
+          info["CFBundleIdentifier"] as? String == "com.focuslock.app",
+          info["CFBundleShortVersionString"] as? String == tag else { return }
+    var sb = stat(); let uid = stat("/dev/console", &sb) == 0 ? sb.st_uid : 0
+    let mine = root + "/Focus Lock.app", userApp = "/Applications/Focus Lock.app"
+    if FileManager.default.fileExists(atPath: userApp) {
+        sh("/bin/rm", ["-rf", userApp]); sh("/bin/cp", ["-R", app, userApp])
+        if uid != 0 { sh("/usr/sbin/chown", ["-R", "\(uid):staff", userApp]) }
+    }
+    sh("/bin/rm", ["-rf", mine]); sh("/bin/cp", ["-R", app, mine])
+    sh("/usr/sbin/chown", ["-R", "root:wheel", mine]); sh("/bin/chmod", ["-R", "go-w", mine])
+    sh("/bin/rm", ["-rf", tmp])
+    if uid != 0 { sh("/bin/launchctl", ["kickstart", "-k", "gui/\(uid)/\(agentLabel)"]) }
+    exit(0)   // launchd restarts the daemon from the new copy
+}
+
 // MARK: root daemon: owns state and /etc/hosts
 func runDaemon() {
     let begin = "# >>> FocusLock (managed, do not edit)", end = "# <<< FocusLock"
@@ -110,6 +155,7 @@ func runDaemon() {
         }
         st.heartbeat = now(); save(); enforceHosts()
         if tick % 5 == 0 { ensureAgent() }
+        if tick % 10800 == 5 { selfUpdate() }   // shortly after start, then about every 6 hours
         tick += 1
         Thread.sleep(forTimeInterval: 2)
     }
@@ -238,6 +284,25 @@ let muted = Color(red: 0.48, green: 0.435, blue: 0.38)
 let clay = Color(red: 0.76, green: 0.34, blue: 0.2)
 let moss = Color(red: 0.25, green: 0.42, blue: 0.3)
 
+// Makes the window itself see-through so the desktop wallpaper shows behind the tan tint.
+struct ClearWindow: NSViewRepresentable {
+    final class V: NSView {
+        override func viewDidMoveToWindow() {
+            // SwiftUI configures the window after this call, so apply on the next runloop turns too.
+            for delay in [0.0, 0.1, 0.5] {
+                DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
+                    guard let w = self?.window else { return }
+                    w.isOpaque = false; w.backgroundColor = .clear
+                    w.titlebarAppearsTransparent = true; w.styleMask.insert(.fullSizeContentView)
+                    w.appearance = NSAppearance(named: .aqua)
+                    w.invalidateShadow()
+                }
+            }
+        }
+    }
+    func makeNSView(context: Context) -> V { V() }
+    func updateNSView(_ v: V, context: Context) {}
+}
 struct Pill: ButtonStyle {
     var fill: Color; var fg: Color = .white
     func makeBody(configuration: Configuration) -> some View {
@@ -321,12 +386,13 @@ struct ContentView: View {
             Text("Blocks " + sites).font(.system(size: 11)).foregroundColor(muted)
                 .multilineTextAlignment(.center).fixedSize(horizontal: false, vertical: true)
         }
-        .padding(28).frame(width: 400, height: 500).background(cream)
+        .padding(28).frame(width: 400, height: 500)
+        .background(ZStack { ClearWindow(); Color(red: 0.95, green: 0.90, blue: 0.80).opacity(0.35) }.ignoresSafeArea())
     }
 }
 struct FocusLockApp: App {
     var body: some Scene {
-        WindowGroup("Focus Lock") { ContentView() }.windowResizability(.contentSize)
+        WindowGroup("Focus Lock") { ContentView() }.windowResizability(.contentSize).windowStyle(.hiddenTitleBar)
     }
 }
 @main enum Main {

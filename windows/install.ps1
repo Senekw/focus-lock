@@ -13,6 +13,9 @@ New-Item -ItemType Directory -Force $dst, $data, $req | Out-Null
 Copy-Item (Join-Path $src 'FocusLock.ps1') $dst -Force
 Copy-Item (Join-Path $src 'uninstall.ps1') $dst -Force
 Copy-Item $list (Join-Path $dst 'blocklist.txt') -Force
+$ver = Join-Path $src 'version.txt'
+if (-not (Test-Path $ver)) { $ver = Join-Path (Split-Path $src) 'VERSION' }
+if (Test-Path $ver) { Set-Content (Join-Path $dst 'version.txt') ("$(Get-Content $ver -Raw)".Trim()) -NoNewline }
 Get-ChildItem $dst | Unblock-File
 # SYSTEM and Administrators: full. Users: read only (state) / modify (request folder).
 & icacls $data /inheritance:r /grant '*S-1-5-18:(OI)(CI)F' '*S-1-5-32-544:(OI)(CI)F' '*S-1-5-32-545:(OI)(CI)RX' | Out-Null
@@ -20,7 +23,8 @@ Get-ChildItem $dst | Unblock-File
 
 $ps = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
 $script = Join-Path $dst 'FocusLock.ps1'
-$action = New-ScheduledTaskAction -Execute $ps -Argument "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$script`" -Mode daemon"
+# The loop restarts the daemon script after it updates itself.
+$action = New-ScheduledTaskAction -Execute $ps -Argument "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -Command `"while (1) { & '$script' -Mode daemon; Start-Sleep 2 }`""
 $trigger = New-ScheduledTaskTrigger -AtStartup
 $principal = New-ScheduledTaskPrincipal -UserId 'SYSTEM' -RunLevel Highest
 $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable `

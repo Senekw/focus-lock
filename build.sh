@@ -1,6 +1,7 @@
 #!/bin/bash
 set -e
 cd "$(dirname "$0")"
+VERSION="${FL_VERSION:-$(cat VERSION)}"
 A="build/Focus Lock.app"; rm -rf build; mkdir -p "$A/Contents/MacOS" "$A/Contents/Resources" build/icon.iconset
 for arch in arm64 x86_64; do
   swiftc -O -parse-as-library -target $arch-apple-macos13.0 main.swift -o build/FocusLock-$arch
@@ -19,7 +20,7 @@ cat > "$A/Contents/Info.plist" <<P
 <key>CFBundleExecutable</key><string>FocusLock</string>
 <key>CFBundleIconFile</key><string>AppIcon</string>
 <key>CFBundlePackageType</key><string>APPL</string>
-<key>CFBundleShortVersionString</key><string>1.0</string>
+<key>CFBundleShortVersionString</key><string>$VERSION</string>
 <key>CFBundleVersion</key><string>1</string>
 <key>LSMinimumSystemVersion</key><string>13.0</string>
 <key>NSHighResolutionCapable</key><true/>
@@ -29,7 +30,7 @@ P
 codesign --force -s - "$A"
 if [ -n "$RELEASE" ]; then
   (cd build && ditto -c -k --keepParent "Focus Lock.app" FocusLock-Mac.zip)
-  mkdir -p build/FocusLock-Windows && cp windows/*.ps1 windows/*.cmd blocklist.txt build/FocusLock-Windows/ && rm -f build/FocusLock-Windows/get.ps1
+  mkdir -p build/FocusLock-Windows && cp windows/*.ps1 windows/*.cmd blocklist.txt build/FocusLock-Windows/ && rm -f build/FocusLock-Windows/get.ps1 && printf '%s' "$VERSION" > build/FocusLock-Windows/version.txt
   (cd build && zip -qr FocusLock-Windows.zip FocusLock-Windows)
 fi
-echo "built: $A (blocklist: $LIST)"
+echo "built: $A v$VERSION (blocklist: $LIST)"

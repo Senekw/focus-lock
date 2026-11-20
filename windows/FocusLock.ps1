@@ -90,12 +90,47 @@ function Stop-BlockedApps($apps) {
         Get-Process -Name $n, ($n -replace ' ', '') | Stop-Process -Force
     }
 }
+# Installs the newest GitHub release over this copy. Lock state and blocklist are kept.
+function Update-Self {
+    try {
+        $ProgressPreference = 'SilentlyContinue'
+        $cur = '0'
+        $vf = Join-Path $PSScriptRoot 'version.txt'
+        if (Test-Path $vf) { $cur = "$(Get-Content $vf -Raw)".Trim() }
+        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+        $rel = Invoke-RestMethod -TimeoutSec 20 -ErrorAction Stop 'https://api.github.com/repos/Senekw/focus-lock/releases/latest'
+        $tag = "$($rel.tag_name)".TrimStart('v')
+        if ($tag -notmatch '^\d+(\.\d+)*$' -or $cur -notmatch '^\d+(\.\d+)*$') { return $false }
+        $a = $tag; if ($a -notmatch '\.') { $a = "$a.0" }
+        $b = $cur; if ($b -notmatch '\.') { $b = "$b.0" }
+        if ([version]$a -le [version]$b) { return $false }
+        $tmp = Join-Path $Root 'update'
+        Remove-Item $tmp -Recurse -Force
+        New-Item -ItemType Directory -Force $tmp | Out-Null
+        Invoke-WebRequest -UseBasicParsing -TimeoutSec 180 -ErrorAction Stop "https://github.com/Senekw/focus-lock/releases/download/v$tag/FocusLock-Windows.zip" -OutFile "$tmp\f.zip"
+        Expand-Archive "$tmp\f.zip" $tmp -Force -ErrorAction Stop
+        $new = Join-Path $tmp 'FocusLock-Windows'
+        $errs = $null
+        [void][Management.Automation.Language.Parser]::ParseFile((Join-Path $new 'FocusLock.ps1'), [ref]$null, [ref]$errs)
+        if ($errs.Count -gt 0) { return $false }
+        if ("$(Get-Content (Join-Path $new 'version.txt') -Raw)".Trim() -ne $tag) { return $false }
+        foreach ($f in 'FocusLock.ps1', 'uninstall.ps1', 'version.txt') {
+            Copy-Item (Join-Path $new $f) (Join-Path $PSScriptRoot $f) -Force -ErrorAction Stop
+        }
+        Remove-Item $tmp -Recurse -Force
+        return $true
+    } catch { return $false }
+}
 function Start-Daemon {
     New-Item -ItemType Directory -Force $Root | Out-Null
     $st = @{ on = $false; lockedUntil = 0.0; since = 0.0; heartbeat = 0.0 }
     $old = Read-State
     if ($old) { $st.on = [bool]$old.on; $st.lockedUntil = [double]$old.lockedUntil; $st.since = [double]$old.since }
+    $tick = 0
     while ($true) {
+        # shortly after start, then about every 6 hours. Returning lets the task's loop start the new script.
+        if ($tick % 10800 -eq 5) { if (Update-Self) { return } }
+        $tick++
         if (Test-Path $ReqPath) {
             $r = ''
             try { if ((Get-Item $ReqPath).Length -lt 64) { $r = [IO.File]::ReadAllText($ReqPath) } } catch {}
@@ -140,6 +175,7 @@ function Start-UI {
     $form.Text = 'Focus Lock'; $form.ClientSize = New-Object Drawing.Size(420, 440)
     $form.FormBorderStyle = 'FixedSingle'; $form.MaximizeBox = $false
     $form.StartPosition = 'CenterScreen'; $form.BackColor = $cream
+    $form.Opacity = 0.9   # slightly see-through so the wallpaper shows behind the tan
     $form.Icon = [Drawing.Icon]::ExtractAssociatedIcon((Join-Path $env:SystemRoot 'System32\Narrator.exe'))
     try { $form.Icon = [Drawing.Icon]::ExtractAssociatedIcon((Join-Path $env:SystemRoot 'System32\credwiz.exe')) } catch {}
 
