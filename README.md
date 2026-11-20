@@ -38,6 +38,10 @@ Done. Focus Lock opens, and there is a **Focus Lock** shortcut on your desktop a
 
 Focus Lock shows the exact time the lock ends (for example "Ends at 6:45 PM"), in your own time zone and clock format. Until then there is no off button. When it ends, blocking stays on until you click **Turn off**.
 
+### Mini window
+
+Click the shrink button at the top right, or just close the window. Focus Lock shrinks to a small window that stays on top of everything, including full-screen apps and full-screen videos, and shows the timer and the time it ends. Click the button on it to open the full window again.
+
 The first time you lock in on a Mac, it asks if Focus Lock can control your browser. Click **Allow** so it can close blocked tabs you already have open.
 
 ## Updates

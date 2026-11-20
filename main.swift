@@ -249,6 +249,7 @@ func runAgent() {
 
 // MARK: UI
 final class Model: ObservableObject {
+    static let shared = Model()
     @Published var state: LockState?
     @Published var t = now()
     @Published var minutes = 60
@@ -284,35 +285,170 @@ let muted = Color(red: 0.13, green: 0.115, blue: 0.10)   // dark enough to stay 
 let clay = Color(red: 0.76, green: 0.34, blue: 0.2)
 let moss = Color(red: 0.25, green: 0.42, blue: 0.3)
 
-// Makes the window itself see-through so the desktop wallpaper shows behind the tan tint.
-struct ClearWindow: NSViewRepresentable {
+func endText(_ t: Double) -> String {
+    // local time zone and the user's own 12/24-hour setting
+    let d = Date(timeIntervalSince1970: t)
+    let time = d.formatted(date: .omitted, time: .shortened)
+    if Calendar.current.isDateInToday(d) { return time }
+    if Calendar.current.isDateInTomorrow(d) { return time + " tomorrow" }
+    return d.formatted(date: .abbreviated, time: .shortened)
+}
+func clock(_ s: Double) -> String {
+    let i = Int(s.rounded(.up)); return String(format: "%d:%02d:%02d", i / 3600, (i / 60) % 60, i % 60)
+}
+
+// Lets the mini window be dragged from anywhere on it.
+struct DragHandle: NSViewRepresentable {
     final class V: NSView {
+        override func mouseDown(with e: NSEvent) { window?.performDrag(with: e) }
+    }
+    func makeNSView(context: Context) -> V { V() }
+    func updateNSView(_ v: V, context: Context) {}
+}
+
+// The small always-on-top window: lock, countdown, end time, and a button to open the full window again.
+struct MiniView: View {
+    @ObservedObject var m = Model.shared
+    @AppStorage("mini") var mini = false
+    var body: some View {
+        let on = m.installed && (m.state?.on ?? false)
+        ZStack(alignment: .trailing) {
+            HStack(spacing: 10) {
+                ZStack {
+                    Circle().fill(on ? clay : Color.white).frame(width: 30, height: 30)
+                    Image(systemName: on ? "lock.fill" : "lock.open").font(.system(size: 13, weight: .semibold))
+                        .foregroundColor(on ? .white : ink)
+                }
+                VStack(alignment: .leading, spacing: 0) {
+                    Text(on ? (m.remaining > 0 ? clock(m.remaining) : "Locked in") : "Not locked")
+                        .font(.system(size: 17, weight: .semibold, design: .rounded)).monospacedDigit().foregroundColor(ink)
+                    if on && m.remaining > 0 {
+                        Text("Ends at " + endText(m.state?.lockedUntil ?? 0)).font(.system(size: 11, weight: .medium))
+                            .foregroundColor(muted).lineLimit(1)
+                    }
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 12).frame(width: 214, height: 52)
+            // more solid than the full window so it stays readable on top of videos and other apps
+            .background(Capsule().fill(cream.opacity(0.94)).overlay(Capsule().strokeBorder(Color.black.opacity(0.08))))
+            .overlay(DragHandle())
+            Button { mini = false } label: {
+                Image(systemName: "arrow.up.left.and.arrow.down.right").font(.system(size: 12, weight: .bold))
+                    .foregroundColor(ink).frame(width: 28, height: 28).background(Circle().fill(Color.white).overlay(Circle().strokeBorder(Color.black.opacity(0.1))))
+            }.buttonStyle(.plain).help("Open the full window").padding(.trailing, 12)
+        }
+        .frame(width: 214, height: 52)
+    }
+}
+
+// Swaps between the full window and the mini panel whenever the "mini" setting changes.
+// The mini window is a non-activating panel: the one kind of window macOS lets sit on top of
+// other apps' full-screen Spaces (full-screen videos, games in a window, and so on).
+final class MiniPanel {
+    static let shared = MiniPanel()
+    var panel: NSPanel?
+    weak var main: NSWindow?
+    var obs: Any?
+    var queued = false
+    func start(_ w: NSWindow?) {
+        if let w { main = w; w.isRestorable = false }
+        if obs == nil {
+            obs = NotificationCenter.default.addObserver(forName: UserDefaults.didChangeNotification, object: nil, queue: nil) { [weak self] _ in
+                DispatchQueue.main.async { self?.later() }
+            }
+        }
+        later()
+    }
+    // Settings can change in the middle of a layout pass (or off the main thread), and showing a window
+    // from inside one crashes SwiftUI, so always sync on a later turn of the main run loop, once.
+    func later() {
+        if queued { return }
+        queued = true
+        DispatchQueue.main.async { [weak self] in self?.queued = false; self?.sync() }
+    }
+    func make() -> NSPanel {
+        let p = NSPanel(contentRect: NSRect(x: 0, y: 0, width: 214, height: 52),
+                        styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
+        p.isFloatingPanel = true; p.level = .statusBar; p.hidesOnDeactivate = false
+        p.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary]
+        p.isOpaque = false; p.backgroundColor = .clear
+        p.appearance = NSAppearance(named: .aqua)
+        p.contentView = NSHostingView(rootView: MiniView())
+        return p
+    }
+    func sync() {
+        if UserDefaults.standard.bool(forKey: "mini") {
+            let p = panel ?? make(); panel = p
+            if !p.isVisible {
+                // first time: where the full window's top left corner is. After that: wherever it was dragged.
+                if !p.setFrameUsingName("FocusLockMini") {
+                    if let f = main?.frame { p.setFrameTopLeftPoint(NSPoint(x: f.minX, y: f.maxY)) } else { p.center() }
+                }
+                p.setFrameAutosaveName("FocusLockMini")
+                p.orderFrontRegardless()
+            }
+            main?.orderOut(nil)
+        } else {
+            panel?.orderOut(nil)
+            if let w = main, !w.isVisible { NSApp.activate(ignoringOtherApps: true); w.makeKeyAndOrderFront(nil) }
+        }
+    }
+}
+
+// Makes the full window see-through so the wallpaper shows behind the tint.
+struct WindowStyle: NSViewRepresentable {
+    final class V: NSView {
+        var keys: Any?
+        // The red close button and Cmd+W shrink to the mini window instead of closing.
+        @objc func shrink() { UserDefaults.standard.set(true, forKey: "mini") }
+        func apply() {
+            guard let w = window else { return }
+            w.isOpaque = false; w.backgroundColor = .clear
+            w.titlebarAppearsTransparent = true; w.styleMask.insert(.fullSizeContentView)
+            w.appearance = NSAppearance(named: .aqua)
+            w.isMovableByWindowBackground = true
+            let close = w.standardWindowButton(.closeButton)
+            close?.target = self; close?.action = #selector(shrink)
+            w.invalidateShadow()
+        }
         override func viewDidMoveToWindow() {
-            // SwiftUI configures the window after this call, so apply on the next runloop turns too.
-            for delay in [0.0, 0.1, 0.5] {
-                DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
-                    guard let w = self?.window else { return }
-                    w.isOpaque = false; w.backgroundColor = .clear
-                    w.titlebarAppearsTransparent = true; w.styleMask.insert(.fullSizeContentView)
-                    w.appearance = NSAppearance(named: .aqua)
-                    w.invalidateShadow()
+            guard let w = window else { return }
+            if keys == nil {
+                keys = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] e in
+                    let mods = e.modifierFlags.intersection(.deviceIndependentFlagsMask)
+                    guard mods == .command, e.charactersIgnoringModifiers == "w" else { return e }
+                    self?.shrink(); return nil
                 }
             }
+            // SwiftUI configures the window after this call, so apply on the next runloop turns too.
+            for delay in [0.0, 0.1, 0.5] {
+                DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in self?.apply() }
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { MiniPanel.shared.start(w) }
         }
     }
     func makeNSView(context: Context) -> V { V() }
     func updateNSView(_ v: V, context: Context) {}
 }
+// Clicking the Dock icon (or opening the app again) brings back the full window.
+final class AppDelegate: NSObject, NSApplicationDelegate {
+    func applicationDidFinishLaunching(_ n: Notification) { MiniPanel.shared.start(nil) }
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        guard MiniPanel.shared.main != nil else { return true }   // first launch: let SwiftUI make the window
+        UserDefaults.standard.set(false, forKey: "mini"); return false
+    }
+}
 struct Pill: ButtonStyle {
     var fill: Color; var fg: Color = .white
     func makeBody(configuration: Configuration) -> some View {
-        configuration.label.font(.system(size: 15, weight: .semibold)).foregroundColor(fg)
+        configuration.label.font(.system(size: 15, weight: .semibold)).foregroundColor(ink)
             .frame(maxWidth: .infinity).padding(.vertical, 14)
             .background(Capsule().fill(fill)).opacity(configuration.isPressed ? 0.8 : 1)
     }
 }
 struct ContentView: View {
-    @StateObject var m = Model()
+    @ObservedObject var m = Model.shared
     let sites: String = {
         var d = readList().domains
         if d.isEmpty, let p = Bundle.main.path(forResource: "blocklist", ofType: "txt"),
@@ -322,20 +458,17 @@ struct ContentView: View {
         let head = d.prefix(5).joined(separator: " · ")
         return d.count > 5 ? head + " and \(d.count - 5) more" : head
     }()
-    func endText(_ t: Double) -> String {
-        // local time zone and the user's own 12/24-hour setting
-        let d = Date(timeIntervalSince1970: t)
-        let time = d.formatted(date: .omitted, time: .shortened)
-        if Calendar.current.isDateInToday(d) { return time }
-        if Calendar.current.isDateInTomorrow(d) { return time + " tomorrow" }
-        return d.formatted(date: .abbreviated, time: .shortened)
-    }
-    func clock(_ s: Double) -> String {
-        let i = Int(s.rounded(.up)); return String(format: "%d:%02d:%02d", i / 3600, (i / 60) % 60, i % 60)
-    }
+    @AppStorage("mini") var mini = false
     var body: some View {
         let on = m.state?.on ?? false
         VStack(spacing: 18) {
+            HStack {
+                Spacer()
+                Button { mini = true } label: {
+                    Image(systemName: "arrow.down.right.and.arrow.up.left").font(.system(size: 12, weight: .bold))
+                        .foregroundColor(ink).frame(width: 26, height: 26).background(Circle().fill(Color.white).overlay(Circle().strokeBorder(Color.black.opacity(0.1))))
+                }.buttonStyle(.plain).help("Shrink to a small window that stays on top")
+            }
             Text("FOCUS LOCK").font(.system(size: 11, weight: .semibold)).tracking(2.5).foregroundColor(muted)
             ZStack {
                 Circle().fill(on ? clay : Color.white).frame(width: 132, height: 132)
@@ -359,7 +492,7 @@ struct ContentView: View {
                             Button(label) { m.extend(v) }.buttonStyle(.plain)
                                 .font(.system(size: 13, weight: .semibold)).foregroundColor(ink)
                                 .padding(.horizontal, 13).padding(.vertical, 9)
-                                .background(Capsule().fill(Color.white))
+                                .background(Capsule().fill(Color.white).overlay(Capsule().strokeBorder(Color.black.opacity(0.1))))
                         }
                     }
                 } else {
@@ -375,7 +508,7 @@ struct ContentView: View {
                             .font(.system(size: 13, weight: .medium))
                             .foregroundColor(m.minutes == v ? .white : ink)
                             .padding(.horizontal, 13).padding(.vertical, 8)
-                            .background(Capsule().fill(m.minutes == v ? moss : Color.white))
+                            .background(Capsule().fill(m.minutes == v ? moss : Color.white).overlay(Capsule().strokeBorder(Color.black.opacity(m.minutes == v ? 0 : 0.1))))
                     }
                 }
                 Text(m.minutes == 0 ? "You can turn it off any time." : "Ends at \(endText(m.t + Double(m.minutes) * 60)). Once on, it cannot be turned off until then.")
@@ -386,11 +519,12 @@ struct ContentView: View {
             Text("Blocks " + sites).font(.system(size: 11, weight: .medium)).foregroundColor(muted)
                 .multilineTextAlignment(.center).fixedSize(horizontal: false, vertical: true)
         }
-        .padding(28).frame(width: 400, height: 500)
-        .background(ZStack { ClearWindow(); Color(red: 0.95, green: 0.90, blue: 0.80).opacity(0.35) }.ignoresSafeArea())
+        .padding(28).frame(width: 400, height: 540)
+        .background(ZStack { WindowStyle(); Color(red: 0.95, green: 0.90, blue: 0.80).opacity(0.35) }.ignoresSafeArea())
     }
 }
 struct FocusLockApp: App {
+    @NSApplicationDelegateAdaptor(AppDelegate.self) var delegate
     var body: some Scene {
         WindowGroup("Focus Lock") { ContentView() }.windowResizability(.contentSize).windowStyle(.hiddenTitleBar)
     }
@@ -400,6 +534,11 @@ struct FocusLockApp: App {
         let a = CommandLine.arguments
         if a.contains("--daemon") { runDaemon() }
         else if a.contains("--agent") { runAgent() }
-        else { FocusLockApp.main() }
+        else {
+            // Always start with a fresh window: macOS would otherwise "restore" the hidden full window as no window at all.
+            UserDefaults.standard.set(false, forKey: "NSQuitAlwaysKeepsWindows")
+            UserDefaults.standard.set(true, forKey: "ApplePersistenceIgnoreState")
+            FocusLockApp.main()
+        }
     }
 }

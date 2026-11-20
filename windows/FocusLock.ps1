@@ -8,6 +8,7 @@ $StatePath = Join-Path $Root 'state.json'
 $ListPath = Join-Path $PSScriptRoot 'blocklist.txt'
 $ReqDir = Join-Path $env:PUBLIC 'FocusLock'
 $ReqPath = Join-Path $ReqDir 'request'
+$UiPath = Join-Path $env:APPDATA 'FocusLock\ui.json'   # remembers whether the small window is showing
 
 function Now { [double]([DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()) / 1000 }
 function Read-State {
@@ -190,6 +191,16 @@ function Start-UI {
     $form.Add_LocationChanged({ Sync-Back })
     $form.Add_Resize({ Sync-Back })
     $form.Add_FormClosed({ $back.Close() })
+    # The X button shrinks to the small always-on-top window. From the small window it really closes.
+    $form.Add_FormClosing({
+        if (-not $ui.mini -and $_.CloseReason -eq 'UserClosing') { $_.Cancel = $true; Set-Mini $true }
+    })
+    $ui = @{ mini = $false }
+    try { $ui.mini = [bool](Get-Content -Raw -ErrorAction Stop $UiPath | ConvertFrom-Json).mini } catch {}
+    function Save-Ui {
+        New-Item -ItemType Directory -Force (Split-Path $UiPath) | Out-Null
+        [IO.File]::WriteAllText($UiPath, ($ui | ConvertTo-Json -Compress))
+    }
     $form.Icon = [Drawing.Icon]::ExtractAssociatedIcon((Join-Path $env:SystemRoot 'System32\Narrator.exe'))
     try { $form.Icon = [Drawing.Icon]::ExtractAssociatedIcon((Join-Path $env:SystemRoot 'System32\credwiz.exe')) } catch {}
 
@@ -198,13 +209,47 @@ function Start-UI {
         $l.SetBounds(20, $y, 380, $h); $l.TextAlign = 'MiddleCenter'; $l.Font = $font; $l.ForeColor = $color
         $form.Controls.Add($l); $l
     }
-    $head = New-Label 24 20 (New-Object Drawing.Font('Segoe UI', 8, [Drawing.FontStyle]::Bold)) $muted
+    $head = New-Label 36 20 (New-Object Drawing.Font('Segoe UI', 8, [Drawing.FontStyle]::Bold)) $muted
     $head.Text = 'F O C U S   L O C K'
     $title = New-Label 70 50 (New-Object Drawing.Font('Georgia', 22)) $ink
     $clock = New-Label 130 50 (New-Object Drawing.Font('Segoe UI', 24, [Drawing.FontStyle]::Bold)) $clay
     $sub = New-Label 240 40 (New-Object Drawing.Font('Segoe UI', 9.5)) $muted
     $foot = New-Label 380 44 (New-Object Drawing.Font('Segoe UI', 8)) $muted
 
+    # Top right: shrink to the small always-on-top window.
+    $tip = New-Object Windows.Forms.ToolTip
+    $toMini = New-Object Windows.Forms.Button
+    $toMini.SetBounds(346, 8, 54, 22); $toMini.Text = 'Mini'; $toMini.FlatStyle = 'Flat'; $toMini.FlatAppearance.BorderSize = 0
+    $toMini.BackColor = $white; $toMini.ForeColor = $ink; $toMini.TabStop = $false
+    $toMini.Font = New-Object Drawing.Font('Segoe UI', 8, [Drawing.FontStyle]::Bold)
+    $tip.SetToolTip($toMini, 'Shrink to a small window that stays on top')
+    $toMini.Add_Click({ Set-Mini $true })
+    $form.Controls.Add($toMini)
+
+    # The small window: timer, end time, and a button back to the full window.
+    $miniPanel = New-Object Windows.Forms.Panel
+    $miniPanel.SetBounds(0, 0, 240, 52); $miniPanel.Visible = $false
+    $miniClock = New-Object Windows.Forms.Label
+    $miniClock.SetBounds(10, 3, 160, 28); $miniClock.TextAlign = 'MiddleLeft'; $miniClock.ForeColor = $ink
+    $miniClock.Font = New-Object Drawing.Font('Segoe UI', 13, [Drawing.FontStyle]::Bold)
+    $miniEnd = New-Object Windows.Forms.Label
+    $miniEnd.SetBounds(12, 30, 160, 18); $miniEnd.TextAlign = 'MiddleLeft'; $miniEnd.ForeColor = $muted
+    $miniEnd.Font = New-Object Drawing.Font('Segoe UI', 8)
+    $miniOpen = New-Object Windows.Forms.Button
+    $miniOpen.SetBounds(178, 11, 52, 30); $miniOpen.Text = 'Open'; $miniOpen.FlatStyle = 'Flat'; $miniOpen.FlatAppearance.BorderSize = 0
+    $miniOpen.BackColor = $white; $miniOpen.ForeColor = $ink
+    $miniOpen.Font = New-Object Drawing.Font('Segoe UI', 8, [Drawing.FontStyle]::Bold)
+    $miniOpen.Add_Click({ Set-Mini $false })
+    $miniPanel.Controls.AddRange(@($miniClock, $miniEnd, $miniOpen))
+    $form.Controls.Add($miniPanel)
+    function Set-Mini($on) {
+        $ui.mini = [bool]$on
+        $miniPanel.Visible = $ui.mini
+        if ($ui.mini) { $miniPanel.BringToFront(); $form.ClientSize = New-Object Drawing.Size(240, 52) }
+        else { $form.ClientSize = New-Object Drawing.Size(420, 440) }
+        $form.TopMost = $ui.mini; $back.TopMost = $ui.mini
+        Sync-Back; Save-Ui
+    }
     $script:minutes = 60
     $script:action = ''
     $durs = @(@(30, '30m'), @(60, '1h'), @(120, '2h'), @(180, '3h'), @(0, 'No timer'))
@@ -296,11 +341,17 @@ function Start-UI {
             $title.Text = 'Locked in'; $sub.Text = 'Timer done. Blocking stays on until you turn it off.'
             $main.Text = 'Turn off'; $main.BackColor = $ink; $main.ForeColor = $white; $script:action = 'off'
         }
+        $miniEnd.Text = ''
+        if (-not $installed) { $miniClock.Text = 'Not installed' }
+        elseif (-not $on) { $miniClock.Text = 'Not locked' }
+        elseif ($script:remaining -gt 0) { $miniClock.Text = $clock.Text; $miniEnd.Text = "Ends at $(Get-EndText ([double]$st.lockedUntil))" }
+        else { $miniClock.Text = 'Locked in' }
     }
     $timer = New-Object Windows.Forms.Timer
     $timer.Interval = 500; $timer.Add_Tick({ Update-View }); $timer.Start()
     Update-View
     $back.Show()
+    if ($ui.mini) { Set-Mini $true }
     [void]$form.ShowDialog($back)
 }
 
