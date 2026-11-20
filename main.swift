@@ -280,7 +280,7 @@ final class Model: ObservableObject {
 }
 let cream = Color(red: 0.965, green: 0.945, blue: 0.906)
 let ink = Color(red: 0.17, green: 0.15, blue: 0.125)
-let muted = Color(red: 0.48, green: 0.435, blue: 0.38)
+let muted = Color(red: 0.27, green: 0.24, blue: 0.20)   // dark enough to stay readable over a wallpaper
 let clay = Color(red: 0.76, green: 0.34, blue: 0.2)
 let moss = Color(red: 0.25, green: 0.42, blue: 0.3)
 
@@ -346,15 +346,15 @@ struct ContentView: View {
             if !m.installed {
                 Text("One step left").font(.custom("Georgia", size: 30)).foregroundColor(ink)
                 Text("Focus Lock needs your Mac password once to install its blocker.")
-                    .font(.system(size: 13)).foregroundColor(muted).multilineTextAlignment(.center)
+                    .font(.system(size: 13, weight: .medium)).foregroundColor(muted).multilineTextAlignment(.center)
                 Button("Finish setup") { m.install() }.buttonStyle(Pill(fill: ink))
             } else if on {
                 Text("Locked in").font(.custom("Georgia", size: 34)).foregroundColor(ink)
                 if m.remaining > 0 {
                     Text(clock(m.remaining)).font(.system(size: 30, weight: .medium, design: .rounded)).monospacedDigit().foregroundColor(clay)
-                    Text("Ends at \(endText(m.state?.lockedUntil ?? 0)). No turning it off until then.").font(.system(size: 13)).foregroundColor(muted)
+                    Text("Ends at \(endText(m.state?.lockedUntil ?? 0)). No turning it off until then.").font(.system(size: 13, weight: .medium)).foregroundColor(muted)
                     HStack(spacing: 8) {
-                        Text("Add time").font(.system(size: 13)).foregroundColor(muted)
+                        Text("Add time").font(.system(size: 13, weight: .medium)).foregroundColor(muted)
                         ForEach([(15, "+15m"), (30, "+30m"), (60, "+1h"), (120, "+2h")], id: \.0) { v, label in
                             Button(label) { m.extend(v) }.buttonStyle(.plain)
                                 .font(.system(size: 13, weight: .semibold)).foregroundColor(ink)
@@ -364,7 +364,7 @@ struct ContentView: View {
                     }
                 } else {
                     Text("Timer done. Blocking stays on until you turn it off.")
-                        .font(.system(size: 13)).foregroundColor(muted).multilineTextAlignment(.center)
+                        .font(.system(size: 13, weight: .medium)).foregroundColor(muted).multilineTextAlignment(.center)
                     Button(m.pending ? "Unlocking…" : "Turn off") { m.unlock() }.buttonStyle(Pill(fill: ink))
                 }
             } else {
@@ -379,11 +379,11 @@ struct ContentView: View {
                     }
                 }
                 Text(m.minutes == 0 ? "You can turn it off any time." : "Ends at \(endText(m.t + Double(m.minutes) * 60)). Once on, it cannot be turned off until then.")
-                    .font(.system(size: 13)).foregroundColor(muted)
+                    .font(.system(size: 13, weight: .medium)).foregroundColor(muted)
                 Button(m.pending ? "Locking…" : "Lock in") { m.lock() }.buttonStyle(Pill(fill: clay))
             }
             Spacer(minLength: 0)
-            Text("Blocks " + sites).font(.system(size: 11)).foregroundColor(muted)
+            Text("Blocks " + sites).font(.system(size: 11, weight: .medium)).foregroundColor(muted)
                 .multilineTextAlignment(.center).fixedSize(horizontal: false, vertical: true)
         }
         .padding(28).frame(width: 400, height: 500)

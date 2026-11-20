@@ -166,7 +166,7 @@ function Start-UI {
     [Windows.Forms.Application]::EnableVisualStyles()
     $cream = [Drawing.Color]::FromArgb(246, 241, 231)
     $ink = [Drawing.Color]::FromArgb(43, 38, 32)
-    $muted = [Drawing.Color]::FromArgb(122, 111, 97)
+    $muted = [Drawing.Color]::FromArgb(69, 61, 51)
     $clay = [Drawing.Color]::FromArgb(194, 87, 51)
     $moss = [Drawing.Color]::FromArgb(64, 107, 77)
     $white = [Drawing.Color]::White
@@ -175,7 +175,21 @@ function Start-UI {
     $form.Text = 'Focus Lock'; $form.ClientSize = New-Object Drawing.Size(420, 440)
     $form.FormBorderStyle = 'FixedSingle'; $form.MaximizeBox = $false
     $form.StartPosition = 'CenterScreen'; $form.BackColor = $cream
-    $form.Opacity = 0.9   # slightly see-through so the wallpaper shows behind the tan
+    # See-through background with solid letters: the main form's tan is keyed out, and a
+    # separate half-transparent tan form sits right behind it.
+    $form.TransparencyKey = $cream
+    $back = New-Object Windows.Forms.Form
+    $back.FormBorderStyle = 'None'; $back.ShowInTaskbar = $false; $back.StartPosition = 'Manual'
+    $back.BackColor = $cream; $back.Opacity = 0.82
+    function Sync-Back {
+        $p = $form.PointToScreen([Drawing.Point]::Empty)
+        $back.Bounds = New-Object Drawing.Rectangle($p.X, $p.Y, $form.ClientSize.Width, $form.ClientSize.Height)
+        $back.Visible = $form.WindowState -ne 'Minimized'
+    }
+    $form.Add_Shown({ Sync-Back })
+    $form.Add_LocationChanged({ Sync-Back })
+    $form.Add_Resize({ Sync-Back })
+    $form.Add_FormClosed({ $back.Close() })
     $form.Icon = [Drawing.Icon]::ExtractAssociatedIcon((Join-Path $env:SystemRoot 'System32\Narrator.exe'))
     try { $form.Icon = [Drawing.Icon]::ExtractAssociatedIcon((Join-Path $env:SystemRoot 'System32\credwiz.exe')) } catch {}
 
@@ -286,7 +300,8 @@ function Start-UI {
     $timer = New-Object Windows.Forms.Timer
     $timer.Interval = 500; $timer.Add_Tick({ Update-View }); $timer.Start()
     Update-View
-    [void]$form.ShowDialog()
+    $back.Show()
+    [void]$form.ShowDialog($back)
 }
 
 if ($Mode -eq 'daemon') { Start-Daemon } else { Start-UI }
