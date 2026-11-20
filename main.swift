@@ -330,8 +330,8 @@ struct MiniView: View {
                 Spacer(minLength: 0)
             }
             .padding(.horizontal, 12).frame(width: 214, height: 52)
-            // more solid than the full window so it stays readable on top of videos and other apps
-            .background(Capsule().fill(cream.opacity(0.94)).overlay(Capsule().strokeBorder(Color.black.opacity(0.08))))
+            // same see-through tan as the full window
+            .background(Capsule().fill(Color(red: 0.95, green: 0.90, blue: 0.80).opacity(0.35)).overlay(Capsule().strokeBorder(Color.black.opacity(0.08))))
             .overlay(DragHandle())
             Button { mini = false } label: {
                 Image(systemName: "arrow.up.left.and.arrow.down.right").font(.system(size: 12, weight: .bold))
