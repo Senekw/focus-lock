@@ -42,6 +42,8 @@ Focus Lock shows the exact time the lock ends (for example "Ends at 6:45 PM"), i
 
 Click the shrink button at the top right, or just close the window. Focus Lock shrinks to a small window that stays on top of everything, including full-screen apps and full-screen videos, and shows the timer and the time it ends. Click the button on it to open the full window again.
 
+The button next to it switches the background between see-through and a solid color.
+
 The first time you lock in on a Mac, it asks if Focus Lock can control your browser. Click **Allow** so it can close blocked tabs you already have open.
 
 ## Updates

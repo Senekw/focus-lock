@@ -8,7 +8,7 @@ $StatePath = Join-Path $Root 'state.json'
 $ListPath = Join-Path $PSScriptRoot 'blocklist.txt'
 $ReqDir = Join-Path $env:PUBLIC 'FocusLock'
 $ReqPath = Join-Path $ReqDir 'request'
-$UiPath = Join-Path $env:APPDATA 'FocusLock\ui.json'   # remembers whether the small window is showing
+$UiPath = Join-Path $env:APPDATA 'FocusLock\ui.json'   # remembers the small window and solid background choices
 
 function Now { [double]([DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()) / 1000 }
 function Read-State {
@@ -195,8 +195,11 @@ function Start-UI {
     $form.Add_FormClosing({
         if (-not $ui.mini -and $_.CloseReason -eq 'UserClosing') { $_.Cancel = $true; Set-Mini $true }
     })
-    $ui = @{ mini = $false }
-    try { $ui.mini = [bool](Get-Content -Raw -ErrorAction Stop $UiPath | ConvertFrom-Json).mini } catch {}
+    $ui = @{ mini = $false; solid = $false }
+    try {
+        $j = Get-Content -Raw -ErrorAction Stop $UiPath | ConvertFrom-Json
+        $ui.mini = [bool]$j.mini; $ui.solid = [bool]$j.solid
+    } catch {}
     function Save-Ui {
         New-Item -ItemType Directory -Force (Split-Path $UiPath) | Out-Null
         [IO.File]::WriteAllText($UiPath, ($ui | ConvertTo-Json -Compress))
@@ -216,10 +219,21 @@ function Start-UI {
     $sub = New-Label 240 40 (New-Object Drawing.Font('Segoe UI', 9.5)) $muted
     $foot = New-Label 380 44 (New-Object Drawing.Font('Segoe UI', 8)) $muted
 
-    # Top right: shrink to the small always-on-top window.
+    # Top right: solid background on or off, and shrink to the small always-on-top window.
     $tip = New-Object Windows.Forms.ToolTip
+    $toSolid = New-Object Windows.Forms.Button
+    $toSolid.SetBounds(292, 4, 60, 22); $toSolid.Text = 'Solid'; $toSolid.FlatStyle = 'Flat'; $toSolid.FlatAppearance.BorderSize = 0
+    $toSolid.TabStop = $false
+    $toSolid.Font = New-Object Drawing.Font('Segoe UI', 8, [Drawing.FontStyle]::Bold)
+    $tip.SetToolTip($toSolid, 'Solid background on or off')
+    function Set-Solid {
+        if ($ui.solid) { $back.Opacity = 1; $toSolid.BackColor = $moss; $toSolid.ForeColor = $white }
+        else { $back.Opacity = 0.82; $toSolid.BackColor = $white; $toSolid.ForeColor = $ink }
+    }
+    $toSolid.Add_Click({ $ui.solid = -not $ui.solid; Set-Solid; Save-Ui })
+    $form.Controls.Add($toSolid)
     $toMini = New-Object Windows.Forms.Button
-    $toMini.SetBounds(346, 8, 54, 22); $toMini.Text = 'Mini'; $toMini.FlatStyle = 'Flat'; $toMini.FlatAppearance.BorderSize = 0
+    $toMini.SetBounds(358, 4, 58, 22); $toMini.Text = 'Mini'; $toMini.FlatStyle = 'Flat'; $toMini.FlatAppearance.BorderSize = 0
     $toMini.BackColor = $white; $toMini.ForeColor = $ink; $toMini.TabStop = $false
     $toMini.Font = New-Object Drawing.Font('Segoe UI', 8, [Drawing.FontStyle]::Bold)
     $tip.SetToolTip($toMini, 'Shrink to a small window that stays on top')
@@ -349,6 +363,7 @@ function Start-UI {
     }
     $timer = New-Object Windows.Forms.Timer
     $timer.Interval = 500; $timer.Add_Tick({ Update-View }); $timer.Start()
+    Set-Solid
     Update-View
     $back.Show()
     if ($ui.mini) { Set-Mini $true }

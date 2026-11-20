@@ -282,6 +282,7 @@ final class Model: ObservableObject {
 let cream = Color(red: 0.965, green: 0.945, blue: 0.906)
 let ink = Color(red: 0.07, green: 0.06, blue: 0.05)
 let muted = Color(red: 0.13, green: 0.115, blue: 0.10)   // dark enough to stay readable over a wallpaper
+let tan = Color(red: 0.95, green: 0.90, blue: 0.80)
 let clay = Color(red: 0.76, green: 0.34, blue: 0.2)
 let moss = Color(red: 0.25, green: 0.42, blue: 0.3)
 
@@ -310,6 +311,7 @@ struct DragHandle: NSViewRepresentable {
 struct MiniView: View {
     @ObservedObject var m = Model.shared
     @AppStorage("mini") var mini = false
+    @AppStorage("solid") var solid = false
     var body: some View {
         let on = m.installed && (m.state?.on ?? false)
         ZStack(alignment: .trailing) {
@@ -330,8 +332,8 @@ struct MiniView: View {
                 Spacer(minLength: 0)
             }
             .padding(.horizontal, 12).frame(width: 214, height: 52)
-            // same see-through tan as the full window
-            .background(Capsule().fill(Color(red: 0.95, green: 0.90, blue: 0.80).opacity(0.35)).overlay(Capsule().strokeBorder(Color.black.opacity(0.08))))
+            // same background as the full window: see-through tan, or solid if that is switched on
+            .background(Capsule().fill(tan.opacity(solid ? 1 : 0.35)).overlay(Capsule().strokeBorder(Color.black.opacity(0.08))))
             .overlay(DragHandle())
             Button { mini = false } label: {
                 Image(systemName: "arrow.up.left.and.arrow.down.right").font(.system(size: 12, weight: .bold))
@@ -459,16 +461,10 @@ struct ContentView: View {
         return d.count > 5 ? head + " and \(d.count - 5) more" : head
     }()
     @AppStorage("mini") var mini = false
+    @AppStorage("solid") var solid = false
     var body: some View {
         let on = m.state?.on ?? false
         VStack(spacing: 18) {
-            HStack {
-                Spacer()
-                Button { mini = true } label: {
-                    Image(systemName: "arrow.down.right.and.arrow.up.left").font(.system(size: 12, weight: .bold))
-                        .foregroundColor(ink).frame(width: 26, height: 26).background(Circle().fill(Color.white).overlay(Circle().strokeBorder(Color.black.opacity(0.1))))
-                }.buttonStyle(.plain).help("Shrink to a small window that stays on top")
-            }
             Text("FOCUS LOCK").font(.system(size: 11, weight: .semibold)).tracking(2.5).foregroundColor(muted)
             ZStack {
                 Circle().fill(on ? clay : Color.white).frame(width: 132, height: 132)
@@ -519,8 +515,21 @@ struct ContentView: View {
             Text("Blocks " + sites).font(.system(size: 11, weight: .medium)).foregroundColor(muted)
                 .multilineTextAlignment(.center).fixedSize(horizontal: false, vertical: true)
         }
-        .padding(28).frame(width: 400, height: 540)
-        .background(ZStack { WindowStyle(); Color(red: 0.95, green: 0.90, blue: 0.80).opacity(0.35) }.ignoresSafeArea())
+        .padding(28).frame(width: 400, height: 500)
+        .background(ZStack(alignment: .topTrailing) {
+            WindowStyle(); tan.opacity(solid ? 1 : 0.35)
+            // very top right, level with the close button: solid background on or off, and shrink
+            HStack(spacing: 8) {
+                Button { solid.toggle() } label: {
+                    Image(systemName: solid ? "circle.fill" : "circle.lefthalf.filled").font(.system(size: 12, weight: .bold))
+                        .foregroundColor(ink).frame(width: 24, height: 24).background(Circle().fill(Color.white).overlay(Circle().strokeBorder(Color.black.opacity(0.1))))
+                }.buttonStyle(.plain).help(solid ? "Make the background see-through" : "Make the background a solid color")
+                Button { mini = true } label: {
+                    Image(systemName: "arrow.down.right.and.arrow.up.left").font(.system(size: 11, weight: .bold))
+                        .foregroundColor(ink).frame(width: 24, height: 24).background(Circle().fill(Color.white).overlay(Circle().strokeBorder(Color.black.opacity(0.1))))
+                }.buttonStyle(.plain).help("Shrink to a small window that stays on top")
+            }.padding(.top, 8).padding(.trailing, 10)
+        }.ignoresSafeArea())
     }
 }
 struct FocusLockApp: App {
