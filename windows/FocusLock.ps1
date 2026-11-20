@@ -165,8 +165,8 @@ function Start-UI {
     Add-Type -AssemblyName System.Drawing
     [Windows.Forms.Application]::EnableVisualStyles()
     $cream = [Drawing.Color]::FromArgb(246, 241, 231)
-    $ink = [Drawing.Color]::FromArgb(43, 38, 32)
-    $muted = [Drawing.Color]::FromArgb(69, 61, 51)
+    $ink = [Drawing.Color]::FromArgb(18, 15, 13)
+    $muted = [Drawing.Color]::FromArgb(33, 29, 25)
     $clay = [Drawing.Color]::FromArgb(194, 87, 51)
     $moss = [Drawing.Color]::FromArgb(64, 107, 77)
     $white = [Drawing.Color]::White

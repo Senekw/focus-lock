@@ -279,8 +279,8 @@ final class Model: ObservableObject {
     }
 }
 let cream = Color(red: 0.965, green: 0.945, blue: 0.906)
-let ink = Color(red: 0.17, green: 0.15, blue: 0.125)
-let muted = Color(red: 0.27, green: 0.24, blue: 0.20)   // dark enough to stay readable over a wallpaper
+let ink = Color(red: 0.07, green: 0.06, blue: 0.05)
+let muted = Color(red: 0.13, green: 0.115, blue: 0.10)   // dark enough to stay readable over a wallpaper
 let clay = Color(red: 0.76, green: 0.34, blue: 0.2)
 let moss = Color(red: 0.25, green: 0.42, blue: 0.3)
 
